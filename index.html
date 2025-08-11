@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeightItCai! - Predict Weight Gain from Food</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        .bubbly-font { font-family: 'Fredoka One', cursive; }
+        .animated-bg {
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .btn { transition: all 0.3s ease; }
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .camera-button {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background-color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .camera-button:hover {
+            transform: scale(1.05);
+        }
+
+        .camera-button:active {
+            transform: scale(0.95);
+        }
+        /* --- Sidebar, Overlay, and Menu Button Styles --- */
+        #menuButton { z-index: 1001; }
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 998;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.4s ease, visibility 0s 0.4s;
+        }
+        #overlay.visible {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.4s ease;
+        }
+        #sidebar {
+            position: fixed;
+            top: 0;
+            right: -350px; /* Start off-screen */
+            width: 320px;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-left: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 1000;
+            transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            box-shadow: -10px 0 30px rgba(0,0,0,0.2);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        #sidebar.open {
+            right: 0; /* Slide in */
+        }
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+        }
+
+        /* --- Cool Features Styles --- */
+        .profile-info { display: flex; align-items: center; }
+        .profile-picture { width: 50px; height: 50px; border-radius: 50%; margin-right: 15px; border: 2px solid white; }
+        .divider { height: 1px; background-color: rgba(255,255,255,0.3); margin: 20px 0; }
+
+        .calorie-tracker {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px auto;
+        }
+        .calorie-tracker-inner {
+            background-color: rgba(0,0,0,0.3);
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        #progressRing { --progress: 0; background: conic-gradient(#4ade80 var(--progress), rgba(255,255,255,0.2) 0); }
+        .tip-card {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: auto; /* Pushes to the bottom */
+        }
+        .analyzing-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #fff;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .image-preview {
+            position: relative;
+        }
+        .image-preview img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+        .remove-image {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background-color: rgba(0,0,0,0.6);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 16px;
+            line-height: 24px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .selected {
+            border: 2px solid #a855f7;
+            background-color: #f3e8ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="overlay"></div>
+
+    <aside id="sidebar">
+        <button id="closeSidebarBtn" class="close-btn p-2 rounded-full hover:bg-white/20 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+
+        <div id="sidebarLoginView">
+            <h2 class="bubbly-font text-3xl mb-6">Welcome!</h2>
+            <p class="mb-6 opacity-80">Log in to save your progress and get personalized insights.</p>
+            
+            <div id="g_id_onload"
+                data-client_id="151531666300-jiqq27n26ra5f0nb08p3srimme6hk975.apps.googleusercontent.com"
+                data-context="signin"
+                data-ux_mode="popup"
+                data-callback="handleCredentialResponse"
+                data-auto_prompt="false">
+            </div>
+            <div id="googleButtonContainer" class="g_id_signin flex justify-center"
+                data-type="standard" data-shape="pill" data-theme="outline" data-text="signin_with"
+                data-size="large" data-logo_alignment="left">
+            </div>
+
+            <div class="divider my-6"></div>
+
+            <form id="emailLoginForm">
+                <p class="mb-3 text-center opacity-80">Or sign in with email</p>
+                <input type="email" placeholder="your@email.com" class="w-full p-3 mb-3 rounded-lg bg-white/20 border-0 text-white placeholder-white/60 focus:ring-2 focus:ring-pink-400 outline-none">
+                <input type="password" placeholder="your password" class="w-full p-3 mb-4 rounded-lg bg-white/20 border-0 text-white placeholder-white/60 focus:ring-2 focus:ring-pink-400 outline-none">
+                <button type="submit" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-4 rounded-full shadow-lg btn">
+                    Log In
+                </button>
+            </form>
+        </div>
+
+        <div id="sidebarProfileView" class="hidden h-full flex flex-col">
+            <div class="profile-info">
+                <img id="profilePicture" src="https://via.placeholder.com/50" alt="Profile" class="profile-picture">
+                <div>
+                    <p id="profileName" class="font-bold text-xl">Guest</p>
+                    <p id="profileEmail" class="text-sm opacity-80">guest@example.com</p>
+                </div>
+            </div>
+            <div class="divider"></div>
+
+            <h3 class="text-lg font-bold text-center">Today's Goal</h3>
+            <div id="progressRing" class="calorie-tracker">
+                <div class="calorie-tracker-inner">
+                    <span id="caloriesTracked" class="text-2xl font-bold">0</span>
+                    <span class="text-xs opacity-80">/ 2000 kcal</span>
+                </div>
+            </div>
+
+            <div id="dailyTipCard" class="tip-card">
+                <p class="font-bold mb-1">💡 Daily Tip</p>
+                <p id="dailyTipText" class="text-sm opacity-90">Stay hydrated! Sometimes your body mistakes thirst for hunger.</p>
+            </div>
+            
+            <button id="logoutBtn" class="w-full mt-6 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-full shadow-lg btn">
+                Log Out
+            </button>
+        </div>
+    </aside>
+
+    <div class="animated-bg min-h-screen flex flex-col">
+        <header class="p-4 flex justify-between items-center relative z-20">
+            <h1 id="mainTitle" class="bubbly-font text-4xl md:text-5xl text-white text-center flex-grow">
+                WeightItCai!
+            </h1>
+            
+            <button id="menuButton" class="absolute top-4 right-4 bg-white/20 p-2 rounded-full text-white hover:bg-white/30 transition-colors btn">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
+                </svg>
+            </button>
+        </header>
+        <main class="flex-grow flex flex-col items-center justify-center px-4 py-8">
+            <div id="onboarding" class="max-w-md w-full bg-white rounded-xl shadow-xl p-6 mb-8">
+                <h2 id="onboardingTitle" class="bubbly-font text-2xl text-center text-purple-600 mb-6">Let's Get Started!</h2>
+                
+                <div class="question active" data-question="name">
+                    <h3 class="font-bold text-lg mb-3">What should we call you?</h3>
+                    <input type="text" class="w-full p-3 border rounded-lg mb-4" placeholder="Your name" id="userNameInput">
+                    <button class="next-btn bg-purple-600 text-white py-2 px-6 rounded-full w-full btn">Next</button>
+                </div>
+                
+                <div class="question hidden" data-question="age">
+                    <h3 class="font-bold text-lg mb-3">How old are you?</h3>
+                    <input type="number" class="w-full p-3 border rounded-lg mb-4" placeholder="Your age" id="userAgeInput">
+                    <button class="next-btn bg-purple-600 text-white py-2 px-6 rounded-full w-full btn">Next</button>
+                </div>
+                <div class="question hidden" data-question="weight">
+                    <h3 class="font-bold text-lg mb-3">What is your current weight?</h3>
+                    <div class="flex mb-4">
+                        <input type="number" class="w-full p-3 border rounded-l-lg" placeholder="Weight" id="userWeightInput">
+                        <select class="p-3 border border-l-0 rounded-r-lg bg-gray-50" id="weightUnit">
+                            <option value="kg">kg</option>
+                            <option value="lbs">lbs</option>
+                        </select>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button class="next-btn bg-purple-600 text-white py-2 px-6 rounded-full flex-grow btn">Next</button>
+                        <button class="skip-btn bg-gray-200 text-gray-700 py-2 px-6 rounded-full btn">Skip</button>
+                    </div>
+                </div>
+                
+                <div class="question hidden" data-question="activity">
+                    <h3 class="font-bold text-lg mb-3">How active are you?</h3>
+                    <div class="grid grid-cols-1 gap-3 mb-4">
+                        <button class="activity-btn bg-gray-100 hover:bg-purple-100 p-4 rounded-lg text-left transition-all flex items-center" data-activity="sedentary">
+                            <span class="text-2xl mr-3">🛋️</span>
+                            <div>
+                                <span class="font-bold">Sedentary</span>
+                                <p class="text-sm text-gray-600">Little or no exercise</p>
+                            </div>
+                        </button>
+                        <button class="activity-btn bg-gray-100 hover:bg-purple-100 p-4 rounded-lg text-left transition-all flex items-center" data-activity="light">
+                            <span class="text-2xl mr-3">🚶</span>
+                            <div>
+                                <span class="font-bold">Lightly Active</span>
+                                <p class="text-sm text-gray-600">Light exercise 1-3 days/week</p>
+                            </div>
+                        </button>
+                        <button class="activity-btn bg-gray-100 hover:bg-purple-100 p-4 rounded-lg text-left transition-all flex items-center" data-activity="moderate">
+                            <span class="text-2xl mr-3">🏃</span>
+                            <div>
+                                <span class="font-bold">Moderately Active</span>
+                                <p class="text-sm text-gray-600">Moderate exercise 3-5 days/week</p>
+                            </div>
+                        </button>
+                        <button class="activity-btn bg-gray-100 hover:bg-purple-100 p-4 rounded-lg text-left transition-all flex items-center" data-activity="very">
+                            <span class="text-2xl mr-3">🏋️</span>
+                            <div>
+                                <span class="font-bold">Very Active</span>
+                                <p class="text-sm text-gray-600">Hard exercise 6-7 days/week</p>
+                            </div>
+                        </button>
+                    </div>
+                    <button class="next-btn bg-purple-600 text-white py-2 px-6 rounded-full w-full btn">Next</button>
+                </div>
+                <div class="question hidden" data-question="goal">
+                    <h3 class="font-bold text-lg mb-3">What's your goal?</h3>
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <button class="goal-btn bg-gray-100 hover:bg-purple-100 p-4 rounded-lg text-center transition-all" data-goal="lose">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-2 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6 6" />
+                            </svg>Lose Weight
+                        </button>
+                        <button class="goal-btn bg-gray-100 hover:bg-purple-100 p-4 rounded-lg text-center transition-all" data-goal="maintain">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-2 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14" />
+                            </svg>
+                            Maintain
+                        </button>
+                        <button class="goal-btn bg-gray-100 hover:bg-purple-100 p-4 rounded-lg text-center transition-all" data-goal="gain">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-2 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                            Gain Weight
+                        </button>
+                        <button class="goal-btn bg-gray-100 hover:bg-purple-100 p-4 rounded-lg text-center transition-all" data-goal="track">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-2 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            Just Track
+                        </button>
+                    </div>
+                    <button class="next-btn bg-purple-600 text-white py-2 px-6 rounded-full w-full btn">Finish</button>
+                </div>
+            </div>
+            <div id="mainApp" class="max-w-md w-full hidden text-center text-white">
+                <div class="mb-6">
+                    <p class="text-lg mb-4">Take a picture or choose from your Gallery of the Nutrition Fact label also it needs a clear picture
+                    </p>
+                    <div class="flex justify-center space-x-8">
+                        <button id="cameraButton" class="bg-white text-purple-600 font-bold py-3 px-6 rounded-full shadow-lg btn flex flex-col items-center">
+                            <svg class="w-10 h-10 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Take a picture
+                        </button>
+                        <label for="fileInput" class="bg-white text-purple-600 font-bold py-3 px-6 rounded-full shadow-lg btn flex flex-col items-center cursor-pointer">
+                            <svg class="w-10 h-10 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Choose from gallery
+                        </label>
+                        <input type="file" id="fileInput" accept="image/*" class="hidden" capture="environment">
+                    </div>
+                </div>
+                <div id="emptyState" class="empty-state mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <p class="text-lg mb-2">No images yet</p>
+                    <p class="text-sm opacity-70">Take a photo of a nutrition label to get started</p>
+                </div>
+                
+                <div id="imageGallery" class="grid grid-cols-2 gap-4 mb-6"></div>
+                
+                <div id="results" class="bg-white text-gray-800 rounded-xl shadow-xl p-6 mb-6 hidden">
+                    <h3 class="bubbly-font text-xl text-center text-purple-600 mb-4">Nutrition Analysis</h3>
+                    <div class="text-center mb-4">
+                        <span class="text-4xl font-bold text-purple-600" id="calorieCount">0</span>
+                        <span class="text-xl"> calories</span>
+                    </div>
+                    <div class="flex justify-between text-sm text-gray-600 mb-4">
+                        <div>
+                            <p>Protein: <span id="proteinAmount" class="font-bold">0g</span></p>
+                            <p>Carbs: <span id="carbsAmount" class="font-bold">0g</span></p>
+                        </div>
+                        <div>
+                            <p>Fat: <span id="fatAmount" class="font-bold">0g</span></p>
+                            <p>Sugar: <span id="sugarAmount" class="font-bold">0g</span></p>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-gray-200">
+                        <h4 class="font-bold text-purple-600 mb-2">Predicted Weight Impact</h4>
+                        <div class="flex items-center justify-between">
+                            <span id="weightImpact" class="font-bold text-lg text-red-500">+0.0 kg</span>
+                            <div class="flex items-center text-right">
+                                <span class="text-sm text-gray-600">Based on your<br>activity level: <strong id="activityLevelDisplay" class="text-purple-600">Moderate</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="aiTips" class="mb-6"></div>
+            </div>
+        </main>
+        <div id="analyzingOverlay" class="analyzing-overlay hidden">
+            <div class="spinner"></div>
+            <p class="text-white text-xl mb-2">Analyzing nutrition facts...</p>
+            <p class="text-white text-sm opacity-70">Our AI is processing your image</p>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- Sidebar, Menu, and Overlay Elements ---
+            const menuButton = document.getElementById('menuButton');
+            const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            const sidebarLoginView = document.getElementById('sidebarLoginView');
+            const sidebarProfileView = document.getElementById('sidebarProfileView');
+            const emailLoginForm = document.getElementById('emailLoginForm');
+
+            // --- App Elements ---
+            const nextButtons = document.querySelectorAll('.next-btn');
+            const skipButton = document.querySelector('.skip-btn');
+            const goalButtons = document.querySelectorAll('.goal-btn');
+            const activityButtons = document.querySelectorAll('.activity-btn');
+            const onboarding = document.getElementById('onboarding');
+            const mainApp = document.getElementById('mainApp');
+            const cameraButton = document.getElementById('cameraButton');
+            const fileInput = document.getElementById('fileInput');
+            const imageGallery = document.getElementById('imageGallery');
+            const emptyState = document.getElementById('emptyState');
+            const results = document.getElementById('results');
+            const aiTips = document.getElementById('aiTips');
+            const analyzingOverlay = document.getElementById('analyzingOverlay');
+            
+            // --- Profile & Title Elements ---
+            const logoutBtn = document.getElementById('logoutBtn');
+            const profileName = document.getElementById('profileName');
+            const profileEmail = document.getElementById('profileEmail');
+            const profilePicture = document.getElementById('profilePicture');
+            const onboardingTitle = document.getElementById('onboardingTitle');
+            const mainTitle = document.getElementById('mainTitle');
+
+            // --- Cool Feature Elements ---
+            const progressRing = document.getElementById('progressRing');
+            const caloriesTracked = document.getElementById('caloriesTracked');
+            const dailyTipText = document.getElementById('dailyTipText');
+            
+            let userData = {
+                name: '',
+                age: null,
+                weight: null,
+                weightUnit: 'kg',
+                activityLevel: 'moderate',
+                goal: '',
+                isLoggedIn: false,
+                googleUser: null,
+                dailyCalories: 0,
+                dailyGoal: 2000 // Default goal
+            };
+            
+            let foodItems = [];
+            let processingImage = false;
+            
+            // --- Sidebar Toggle Functionality ---
+            const toggleSidebar = () => {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('visible');
+                if (sidebar.classList.contains('open')) {
+                    displayDailyTip();
+                }
+            };
+            menuButton.addEventListener('click', toggleSidebar);
+            closeSidebarBtn.addEventListener('click', toggleSidebar);
+            overlay.addEventListener('click', toggleSidebar);
+            // --- Daily Tip Feature ---
+            const tips = [
+                "Stay hydrated! Sometimes your body mistakes thirst for hunger.",
+                "Protein at breakfast can help reduce cravings later in the day.",
+                "Colorful plates usually mean more nutrients. Eat the rainbow! 🌈",
+                "Even a 15-minute walk after a meal can aid digestion and manage blood sugar.",
+                "Mindful eating: chew slowly and savor each bite. It helps you recognize fullness.",
+                "Don't shop for groceries when you're hungry. You're more likely to buy high-calorie foods.",
+                "Getting 7-9 hours of quality sleep can significantly impact your metabolism."
+            ];
+            const displayDailyTip = () => {
+                const randomIndex = Math.floor(Math.random() * tips.length);
+                dailyTipText.textContent = tips[randomIndex];
+            };
+
+            // --- Calorie Tracker Update ---
+            const updateCalorieTracker = () => {
+                const percentage = Math.min((userData.dailyCalories / userData.dailyGoal) * 360, 360);
+                caloriesTracked.textContent = userData.dailyCalories;
+                progressRing.style.setProperty('--progress', `${percentage}deg`);
+            };
+
+            // --- UI Function to handle sidebar and main title ---
+            function updateLoginUI() {
+                if (userData.isLoggedIn) {
+                    sidebarLoginView.classList.add('hidden');
+                    sidebarProfileView.classList.remove('hidden');
+
+                    if (userData.googleUser) {
+                        const user = userData.googleUser;
+                        profileName.textContent = user.given_name;
+                        profileEmail.textContent = user.email;
+                        profilePicture.src = user.picture;
+                        mainTitle.textContent = `Hello, ${user.given_name}!`;
+                        onboardingTitle.textContent = `Welcome, ${user.given_name}!`;
+                    }
+                    updateCalorieTracker();
+                } else {
+                    sidebarLoginView.classList.remove('hidden');
+                    sidebarProfileView.classList.add('hidden');
+                    
+                    profileName.textContent = 'Guest';
+                    profileEmail.textContent = 'guest@example.com';
+                    profilePicture.src = 'https://via.placeholder.com/50';
+                    mainTitle.textContent = 'WeightItCai!';
+                    onboardingTitle.textContent = 'Let\'s Get Started!';
+                    
+                    userData.dailyCalories = 0;
+                    updateCalorieTracker();
+                }
+            }
+            // --- Google Login Handler ---
+            window.handleCredentialResponse = function(response) {
+                const credential = response.credential;
+                const decoded = JSON.parse(atob(credential.split('.')[1]));
+                
+                userData.isLoggedIn = true;
+                userData.googleUser = {
+                    name: decoded.name,
+                    given_name: decoded.given_name,
+                    email: decoded.email,
+                    picture: decoded.picture
+                };
+                
+                updateLoginUI();
+                toggleSidebar();
+                alert(`Welcome back, ${decoded.given_name}!`);
+            };
+
+            // --- Email Login Form Handler (Placeholder) ---
+            emailLoginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                alert("Email login is for demonstration purposes. Please use the Google Sign-In button!");
+            });
+
+            // --- Logout Handler ---
+            logoutBtn.addEventListener('click', function() {
+                userData.isLoggedIn = false;
+                userData.googleUser = null;
+                if (window.google && google.accounts && google.accounts.id) {
+                    google.accounts.id.disableAutoSelect();
+                }
+                updateLoginUI();
+                toggleSidebar();
+                alert('You have been logged out. See you next time!');
+            });
+            
+            // --- Onboarding Logic ---
+            nextButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const currentQuestion = this.closest('.question');
+                    const currentQuestionId = currentQuestion.dataset.question;
+                    
+                    if (currentQuestionId === 'name') {
+                        userData.name = document.getElementById('userNameInput').value || 'User';
+                    } else if (currentQuestionId === 'age') {
+                        userData.age = parseInt(document.getElementById('userAgeInput').value) || 30;
+                    } else if (currentQuestionId === 'weight') {
+                        userData.weight = parseFloat(document.getElementById('userWeightInput').value) || 70;
+                        userData.weightUnit = document.getElementById('weightUnit').value;
+                    }
+                    
+                    currentQuestion.classList.add('hidden');
+                    currentQuestion.classList.remove('active');
+                    
+                    let nextQuestionElement;
+                    if (currentQuestionId === 'name') nextQuestionElement = document.querySelector('[data-question="age"]');
+                    else if (currentQuestionId === 'age') nextQuestionElement = document.querySelector('[data-question="weight"]');
+                    else if (currentQuestionId === 'weight') nextQuestionElement = document.querySelector('[data-question="activity"]');
+                    else if (currentQuestionId === 'activity') nextQuestionElement = document.querySelector('[data-question="goal"]');
+                    else if (currentQuestionId === 'goal') {
+                        onboarding.classList.add('hidden');
+                        mainApp.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    if (nextQuestionElement) {
+                        nextQuestionElement.classList.remove('hidden');
+                        nextQuestionElement.classList.add('active');
+                    }
+                });
+            });
+
+            skipButton.addEventListener('click', function() {
+                const currentQuestion = this.closest('.question');
+                currentQuestion.classList.add('hidden');
+                const nextQuestion = document.querySelector('[data-question="activity"]');
+                if(nextQuestion) nextQuestion.classList.remove('hidden');
+            });
+
+            activityButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    activityButtons.forEach(btn => btn.classList.remove('selected'));
+                    this.classList.add('selected');
+                    userData.activityLevel = this.dataset.activity;
+                });
+            });
+
+            goalButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    goalButtons.forEach(btn => btn.classList.remove('selected'));
+                    this.classList.add('selected');
+                    userData.goal = this.dataset.goal;
+                });
+            });
+            // --- Main App Logic (Image Processing) ---
+            cameraButton.addEventListener('click', () => {
+                if (!processingImage) fileInput.click();
+            });
+
+            fileInput.addEventListener('change', async function(event) {
+                const file = event.target.files[0];
+                if (file && !processingImage) {
+                    processingImage = true;
+                    analyzingOverlay.classList.remove('hidden');
+                    results.classList.add('hidden');
+                    aiTips.innerHTML = '';
+
+                    try {
+                        const analysisResult = await simulateAIAnalysis(file);
+                        
+                        // Add to calorie tracker
+                        userData.dailyCalories += analysisResult.calories;
+                        updateCalorieTracker();
+
+                        foodItems.push(analysisResult);
+                        renderImageGallery();
+
+                        document.getElementById('calorieCount').textContent = analysisResult.calories;
+                        document.getElementById('proteinAmount').textContent = `${analysisResult.protein}g`;
+                        document.getElementById('carbsAmount').textContent = `${analysisResult.carbs}g`;
+                        document.getElementById('fatAmount').textContent = `${analysisResult.fat}g`;
+                        document.getElementById('sugarAmount').textContent = `${analysisResult.sugar}g`;
+                        document.getElementById('weightImpact').textContent = `+${analysisResult.weightImpactKg} kg`;
+                        document.getElementById('activityLevelDisplay').textContent = 
+                            userData.activityLevel.charAt(0).toUpperCase() + userData.activityLevel.slice(1);
+
+                        results.classList.remove('hidden');
+                        generateAiTips(parseFloat(analysisResult.weightImpactKg));
+                        
+                    } catch (error) {
+                        results.classList.remove('hidden');
+                        aiTips.innerHTML = `<div class="bg-red-100 text-red-800 p-4 rounded-lg shadow-md"><p class="font-bold">Analysis Failed:</p><p>${error.message}</p></div>`;
+                        
+                    } finally {
+                        analyzingOverlay.classList.add('hidden');
+                        processingImage = false;
+                        fileInput.value = '';
+                    }
+                }
+            });
+
+            function simulateAIAnalysis(imageFile) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const imageUrl = e.target.result;
+                        
+                        setTimeout(() => {
+                            const isSuccess = Math.random() > 0.1;
+                            if (isSuccess) {
+                                const calories = Math.floor(Math.random() * (800 - 50) + 50);
+                                const protein = Math.floor(Math.random() * (40 - 2) + 2);
+                                const carbs = Math.floor(Math.random() * (90 - 5) + 5);
+                                const fat = Math.floor(Math.random() * (60 - 1) + 1);
+                                const sugar = Math.floor(Math.random() * (carbs * 0.8));
+
+                                let weightImpactKg = (calories / 7700);
+                                switch(userData.activityLevel) {
+                                    case 'sedentary': weightImpactKg *= 1.2; break;
+                                    case 'light': weightImpactKg *= 1.1; break;
+                                    case 'moderate': weightImpactKg *= 1.0; break;
+                                    case 'very': weightImpactKg *= 0.9; break;
+                                }
+                                
+                                resolve({
+                                    imageUrl, calories, protein, carbs, fat, sugar,
+                                    weightImpactKg: weightImpactKg.toFixed(3)
+                                });
+                            } else {
+                                reject(new Error("AI could not read the nutrition facts. Please try a clearer image."));
+                            }
+                        }, 2500);
+                    };
+                    reader.onerror = () => reject(new Error("Could not read the image file."));
+                    reader.readAsDataURL(imageFile);
+                });
+            }
+
+            function generateAiTips(weightImpactKg) {
+                aiTips.innerHTML = '';
+                let tips = [];
+                if (weightImpactKg > 0.05) {
+                    tips.push("High impact! 😮 Consider a smaller portion or pairing this with a light, low-calorie side like a fresh salad.");
+                } else if (weightImpactKg > 0.02) {
+                    tips.push("This fits well into a balanced day! Enjoy it. Maybe go for a short walk later to feel extra great. 🚶‍♀️");
+                } else {
+                    tips.push("Excellent choice! ✅ This has a very low impact on your goals. Keep up the great work!");
+                }
+                tips.forEach(tip => {
+                    const tipCard = document.createElement('div');
+                    tipCard.className = 'p-4 rounded-lg bg-white/20 shadow-md text-white mb-3 text-left';
+                    tipCard.innerHTML = `<p class="font-bold text-lg mb-1">💡 AI Tip:</p><p>${tip}</p>`;
+                    aiTips.appendChild(tipCard);
+                });
+            }
+
+            function updateEmptyState() {
+                emptyState.style.display = foodItems.length === 0 ? 'block' : 'none';
+                imageGallery.style.display = foodItems.length > 0 ? 'grid' : 'none';
+            }
+
+            function renderImageGallery() {
+                imageGallery.innerHTML = '';
+                foodItems.forEach((item, index) => {
+                    const previewDiv = document.createElement('div');
+                    previewDiv.className = 'image-preview';
+                    previewDiv.innerHTML = `
+                        <img src="${item.imageUrl}" alt="Food Image ${index + 1}">
+                        <button class="remove-image" data-index="${index}">×</button>
+                    `;
+                    imageGallery.appendChild(previewDiv);
+                });
+                updateEmptyState();
+            }
+
+            imageGallery.addEventListener('click', function(event) {
+                if (event.target.classList.contains('remove-image')) {
+                    const indexToRemove = parseInt(event.target.dataset.index);
+                    foodItems.splice(indexToRemove, 1);
+                    renderImageGallery();
+                    if (foodItems.length === 0) {
+                        results.classList.add('hidden');
+                        aiTips.innerHTML = '';
+                    }
+                }
+            });
+
+            // Initial UI setup on page load
+            updateEmptyState();
+            updateLoginUI();
+        });
+    </script>
+</body>
+</html>
